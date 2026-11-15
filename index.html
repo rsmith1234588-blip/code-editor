@@ -1,0 +1,898 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Snapcode Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: app bar on top; block workspace on the left, live JavaScript over a running preview on the right. Stacks on phones. */
+:root {
+  --bg: #eceff6;
+  --surface: #ffffff;
+  --surface-2: #f5f6fb;
+  --line: #d8dce9;
+  --ink: #1a1d2e;
+  --muted: #5b6182;
+  --accent: #ff6b2c;
+  --accent-ink: #ffffff;
+  --accent-soft: #fff0e8;
+  --ok: #148a5b;
+  --err: #c92a4b;
+  --code-bg: #fbfbfe;
+  --ws-bg: #f7f8fc;
+  --ws-grid: #d3d7e6;
+  --syn-kw: #b4237a;
+  --syn-str: #17804c;
+  --syn-num: #b45309;
+  --syn-fn: #2b55d6;
+  --syn-com: #868ba6;
+  --syn-var: #6d3fd1;
+  --font-display: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-code: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1019; --surface: #161925; --surface-2: #1d2131; --line: #2a2f45; --ink: #e8eaf4; --muted: #9ba1bf;
+    --accent: #ff7a3d; --accent-ink: #1a0c04; --accent-soft: #3a2116; --ok: #4ad49a; --err: #ff6b88;
+    --code-bg: #121522; --ws-bg: #131623; --ws-grid: #272c40;
+    --syn-kw: #f47ab8; --syn-str: #6fe3a6; --syn-num: #fbbf4a; --syn-fn: #85a8ff; --syn-com: #6c7294; --syn-var: #c3a3ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1019; --surface: #161925; --surface-2: #1d2131; --line: #2a2f45; --ink: #e8eaf4; --muted: #9ba1bf;
+  --accent: #ff7a3d; --accent-ink: #1a0c04; --accent-soft: #3a2116; --ok: #4ad49a; --err: #ff6b88;
+  --code-bg: #121522; --ws-bg: #131623; --ws-grid: #272c40;
+  --syn-kw: #f47ab8; --syn-str: #6fe3a6; --syn-num: #fbbf4a; --syn-fn: #85a8ff; --syn-com: #6c7294; --syn-var: #c3a3ff;
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------- App bar ---------- */
+.bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+.brand svg { flex: none; }
+.brand h1 {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1;
+}
+.brand h1 .arrow { color: var(--accent); }
+.tally {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tally b { color: var(--ink); font-weight: 700; }
+.controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+button, select {
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+button:hover, select:hover { border-color: var(--muted); }
+button:focus-visible, select:focus-visible, input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.run {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+  padding: 8px 16px;
+  display: inline-flex; align-items: center; gap: 7px;
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 60%, #000);
+}
+.run:hover { border-color: transparent; filter: brightness(1.05); }
+.run:active { transform: translateY(1px); box-shadow: none; }
+.run svg { width: 12px; height: 12px; }
+.ghost { background: transparent; }
+.danger-armed { background: var(--err); color: #fff; border-color: transparent; }
+
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; user-select: none; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch-track {
+  width: 34px; height: 20px; border-radius: 20px; background: var(--line); position: relative; transition: background .15s;
+}
+.switch-track::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--surface); transition: transform .15s;
+}
+.switch input:checked + .switch-track { background: var(--ok); }
+.switch input:checked + .switch-track::after { transform: translateX(14px); }
+
+/* ---------- Main layout ---------- */
+main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr);
+  gap: 12px;
+  padding-block: 12px;
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.panel-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.panel-head h2 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 auto 0 0;
+  letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 8px;
+}
+.panel-head .hint { font-size: 12px; color: var(--muted); font-weight: 500; font-family: var(--font-body); }
+.panel-head button { padding: 5px 10px; font-size: 12.5px; }
+.dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+
+#blocks { flex: 1; min-height: 0; position: relative; }
+.right { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-height: 0; min-width: 0; }
+
+/* ---------- Code view ---------- */
+.code-wrap { flex: 1; overflow: auto; background: var(--code-bg); min-height: 0; }
+pre.code {
+  margin: 0;
+  padding: 12px 0;
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  line-height: 1.65;
+  counter-reset: ln;
+  tab-size: 2;
+}
+pre.code .ln { display: block; padding: 0 16px 0 0; white-space: pre; }
+pre.code .ln::before {
+  counter-increment: ln;
+  content: counter(ln);
+  display: inline-block;
+  width: 3.2em;
+  padding-right: 1.1em;
+  text-align: right;
+  color: var(--syn-com);
+  opacity: .7;
+  user-select: none;
+}
+pre.code .ln.fresh { animation: fresh 1.1s ease-out; }
+@keyframes fresh { from { background: var(--accent-soft); } to { background: transparent; } }
+.empty {
+  padding: 24px 20px; color: var(--muted); font-size: 13.5px; line-height: 1.55; max-width: 40ch;
+}
+.empty strong { color: var(--ink); }
+.hljs-keyword, .hljs-built_in.hljs-keyword { color: var(--syn-kw); font-weight: 500; }
+.hljs-string { color: var(--syn-str); }
+.hljs-number, .hljs-literal { color: var(--syn-num); }
+.hljs-title, .hljs-title.function_, .hljs-built_in { color: var(--syn-fn); }
+.hljs-comment { color: var(--syn-com); font-style: italic; }
+.hljs-variable, .hljs-property, .hljs-attr { color: var(--syn-var); }
+.hljs-params { color: var(--ink); }
+
+/* ---------- Preview ---------- */
+.preview-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height: 0; }
+.console {
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  font-family: var(--font-code);
+  font-size: 12px;
+  max-height: 38%;
+  min-height: 64px;
+  overflow: auto;
+}
+.console-label {
+  position: sticky; top: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 12px;
+  background: var(--surface-2);
+  font-family: var(--font-body);
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+}
+.console-label button { font-size: 11px; padding: 2px 8px; text-transform: none; letter-spacing: 0; }
+.console ol { list-style: none; margin: 0; padding: 0 12px 8px; }
+.console li { padding: 3px 0; border-bottom: 1px dashed var(--line); white-space: pre-wrap; word-break: break-word; }
+.console li:last-child { border-bottom: 0; }
+.console li.error { color: var(--err); }
+.console li.quiet { color: var(--muted); font-family: var(--font-body); border: 0; }
+.console li::before { content: "› "; color: var(--muted); }
+.console li.quiet::before { content: ""; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 20px);
+  background: var(--ink);
+  color: var(--bg);
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+  z-index: 50;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Blockly tweaks */
+.blocklyToolboxDiv, .blocklyTreeLabel, .blocklyToolboxCategoryLabel { font-family: var(--font-body) !important; }
+.blocklyTreeLabel, .blocklyToolboxCategoryLabel { font-weight: 600; }
+.blocklyMainBackground { stroke: none !important; }
+
+@media (max-width: 860px) {
+  body { overflow: auto; height: auto; min-height: 100%; }
+  main { grid-template-columns: minmax(0, 1fr); }
+  .blocks-panel { height: 66vh; min-height: 440px; }
+  .right { grid-template-rows: auto auto; }
+  .code-panel .code-wrap { max-height: 46vh; min-height: 220px; }
+  .preview-panel { height: 70vh; min-height: 420px; }
+  .tally { order: 3; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  pre.code .ln.fresh { animation: none; }
+  .toast, .switch-track, .switch-track::after { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <svg width="34" height="28" viewBox="0 0 34 28" aria-hidden="true">
+      <path d="M2 4a3 3 0 0 1 3-3h5l2 3h6l2-3h9a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H20l-2 3h-6l-2-3H5a3 3 0 0 1-3-3z" fill="#2f80ed"/>
+      <path d="M2 18a3 3 0 0 1 3-3h5l2 3h6l2-3h9a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3z" fill="var(--accent)"/>
+    </svg>
+    <h1>Snapcode <span class="arrow">→</span> JS</h1>
+  </div>
+  <div class="tally" id="tally"><b>0</b> blocks became <b>0</b> lines of JavaScript</div>
+  <div class="controls">
+    <select id="examples" aria-label="Load an example">
+      <option value="">Load an example…</option>
+      <option value="hello">Click counter page</option>
+      <option value="tip">Tip calculator</option>
+      <option value="confetti">Confetti art</option>
+      <option value="countdown">Rocket countdown</option>
+      <option value="mover">Arrow-key dot game</option>
+    </select>
+    <label class="switch" title="Run your program every time you change a block">
+      <input type="checkbox" id="autorun" checked>
+      <span class="switch-track"></span>
+      Auto-run
+    </label>
+    <button id="clear" class="ghost">Clear</button>
+    <button id="run" class="run"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>Run</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel blocks-panel" aria-label="Block workspace">
+    <div class="panel-head">
+      <h2><span class="dot" style="background:#2f80ed"></span>Blocks <span class="hint">drag from the categories, snap them together</span></h2>
+    </div>
+    <div id="blocks"></div>
+  </section>
+
+  <div class="right">
+    <section class="panel code-panel" aria-label="Generated JavaScript">
+      <div class="panel-head">
+        <h2><span class="dot" style="background:var(--syn-num)"></span>JavaScript</h2>
+        <button id="copyJs">Copy code</button>
+        <button id="copyHtml" title="Copies a complete .html file you can save and open in any browser">Copy as web page</button>
+      </div>
+      <div class="code-wrap" id="codeWrap"><pre class="code" id="code"></pre></div>
+    </section>
+
+    <section class="panel preview-panel" aria-label="Preview">
+      <div class="panel-head">
+        <h2><span class="dot" style="background:var(--ok)"></span>Preview <span class="hint" id="runState">not run yet</span></h2>
+        <button id="restart">Restart</button>
+      </div>
+      <div class="preview-body">
+        <iframe id="stage" title="Your running program" sandbox="allow-scripts"></iframe>
+        <div class="console" id="consoleBox">
+          <div class="console-label">Console <button id="clearLog">Clear</button></div>
+          <ol id="log"><li class="quiet">Messages from “log” blocks and any errors show up here.</li></ol>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/blockly@11.1.1/blockly.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const G = javascript.javascriptGenerator;
+  const Order = javascript.Order;
+  const STORE_KEY = 'snapcode-workspace-v1';
+
+  const HUE = { page: '#2f80ed', draw: '#e0457b', color: '#f2994a', event: '#13a582' };
+
+  const COLORS = [
+    ['red', '#ff5a5f'], ['orange', '#ff9f1c'], ['yellow', '#ffd23f'], ['green', '#3ddc97'],
+    ['blue', '#3a86ff'], ['purple', '#8338ec'], ['pink', '#ff70a6'], ['black', '#222222'],
+    ['white', '#ffffff'], ['cream', '#fff4d6'], ['sky', '#dff3ff'], ['mint', '#e3fcef']
+  ];
+
+  // ---------- Custom blocks ----------
+  Blockly.Msg.TEXT_PRINT_TITLE = 'log %1';
+  Blockly.Msg.TEXT_PRINT_TOOLTIP = 'Write a message to the console under the preview.';
+
+  Blockly.defineBlocksWithJsonArray([
+    { type: 'page_heading', message0: 'add heading %1', args0: [{ type: 'input_value', name: 'TEXT' }],
+      previousStatement: null, nextStatement: null, colour: HUE.page, tooltip: 'Adds a big title to the page.' },
+    { type: 'page_text', message0: 'add text %1', args0: [{ type: 'input_value', name: 'TEXT' }],
+      previousStatement: null, nextStatement: null, colour: HUE.page, tooltip: 'Adds a paragraph of text to the page.' },
+    { type: 'page_button', message0: 'add button %1', args0: [{ type: 'input_value', name: 'TEXT' }],
+      message1: 'when clicked %1', args1: [{ type: 'input_statement', name: 'DO' }],
+      previousStatement: null, nextStatement: null, colour: HUE.page, tooltip: 'Adds a button. The blocks inside run each time it is clicked.' },
+    { type: 'page_input', message0: 'add input box named %1 hint %2',
+      args0: [{ type: 'field_input', name: 'NAME', text: 'answer' }, { type: 'field_input', name: 'HINT', text: 'Type here' }],
+      previousStatement: null, nextStatement: null, colour: HUE.page, tooltip: 'Adds a box people can type into. Read it later with “text in box”.' },
+    { type: 'page_value', message0: 'text in box %1', args0: [{ type: 'field_input', name: 'NAME', text: 'answer' }],
+      output: 'String', colour: HUE.page, tooltip: 'Whatever is typed in the input box with this name.' },
+    { type: 'page_number', message0: 'number in box %1', args0: [{ type: 'field_input', name: 'NAME', text: 'answer' }],
+      output: 'Number', colour: HUE.page, tooltip: 'The input box contents as a number, ready for math.' },
+    { type: 'page_background', message0: 'set background to %1', args0: [{ type: 'input_value', name: 'COLOR' }],
+      previousStatement: null, nextStatement: null, colour: HUE.page, tooltip: 'Changes the page background color.' },
+    { type: 'page_textcolor', message0: 'set text color to %1', args0: [{ type: 'input_value', name: 'COLOR' }],
+      previousStatement: null, nextStatement: null, colour: HUE.page, tooltip: 'Changes the color of all the text.' },
+    { type: 'page_clear', message0: 'clear the page', previousStatement: null, nextStatement: null,
+      colour: HUE.page, tooltip: 'Removes everything from the page.' },
+
+    { type: 'draw_circle', message0: 'draw circle x %1 y %2 size %3 color %4',
+      args0: [{ type: 'input_value', name: 'X', check: 'Number' }, { type: 'input_value', name: 'Y', check: 'Number' },
+              { type: 'input_value', name: 'R', check: 'Number' }, { type: 'input_value', name: 'COLOR' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: HUE.draw,
+      tooltip: 'Draws a filled circle. The drawing area is 480 wide and 320 tall.' },
+    { type: 'draw_rect', message0: 'draw box x %1 y %2 width %3 height %4 color %5',
+      args0: [{ type: 'input_value', name: 'X', check: 'Number' }, { type: 'input_value', name: 'Y', check: 'Number' },
+              { type: 'input_value', name: 'W', check: 'Number' }, { type: 'input_value', name: 'H', check: 'Number' },
+              { type: 'input_value', name: 'COLOR' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: HUE.draw, tooltip: 'Draws a filled rectangle.' },
+    { type: 'draw_text', message0: 'write %1 at x %2 y %3 color %4',
+      args0: [{ type: 'input_value', name: 'TEXT' }, { type: 'input_value', name: 'X', check: 'Number' },
+              { type: 'input_value', name: 'Y', check: 'Number' }, { type: 'input_value', name: 'COLOR' }],
+      inputsInline: true, previousStatement: null, nextStatement: null, colour: HUE.draw, tooltip: 'Writes text on the drawing.' },
+    { type: 'draw_clear', message0: 'clear the drawing', previousStatement: null, nextStatement: null,
+      colour: HUE.draw, tooltip: 'Wipes the drawing area clean.' },
+
+    { type: 'color_pick', message0: '%1', args0: [{ type: 'field_dropdown', name: 'COLOR', options: COLORS }],
+      output: 'String', colour: HUE.color, tooltip: 'A color.' },
+    { type: 'color_random', message0: 'random color', output: 'String', colour: HUE.color, tooltip: 'A different bright color every time.' },
+
+    { type: 'time_every', message0: 'every %1 seconds', args0: [{ type: 'input_value', name: 'SECS', check: 'Number' }],
+      message1: 'do %1', args1: [{ type: 'input_statement', name: 'DO' }],
+      previousStatement: null, nextStatement: null, colour: HUE.event, tooltip: 'Runs the blocks inside again and again.' },
+    { type: 'time_after', message0: 'after %1 seconds', args0: [{ type: 'input_value', name: 'SECS', check: 'Number' }],
+      message1: 'do %1', args1: [{ type: 'input_statement', name: 'DO' }],
+      previousStatement: null, nextStatement: null, colour: HUE.event, tooltip: 'Waits, then runs the blocks inside once.' },
+    { type: 'event_key', message0: 'when key %1 is pressed', args0: [{ type: 'field_dropdown', name: 'KEY', options: [
+        ['← left arrow', 'ArrowLeft'], ['→ right arrow', 'ArrowRight'], ['↑ up arrow', 'ArrowUp'], ['↓ down arrow', 'ArrowDown'],
+        ['space', ' '], ['enter', 'Enter']] }],
+      message1: 'do %1', args1: [{ type: 'input_statement', name: 'DO' }],
+      previousStatement: null, nextStatement: null, colour: HUE.event,
+      tooltip: 'Runs the blocks inside when that key is pressed. Click the preview first so it can hear the keyboard.' }
+  ]);
+
+  // ---------- Generators: blocks -> real, portable JavaScript ----------
+  G.addReservedWords('canvas,ctx,event');
+  const val = (b, name, fallback, order) => G.valueToCode(b, name, order || Order.NONE) || fallback;
+  const idOf = (b) => G.quote_(String(b.getFieldValue('NAME') || 'box').trim().replace(/[^\w-]/g, '_') || 'box');
+  const needCanvas = () => {
+    G.definitions_['canvas'] =
+      "var canvas = document.createElement('canvas');\n" +
+      'canvas.width = 480;\ncanvas.height = 320;\n' +
+      'document.body.appendChild(canvas);\n' +
+      "var ctx = canvas.getContext('2d');";
+  };
+  const fresh = (base) => G.nameDB_.getDistinctName(base, Blockly.Names.NameType.VARIABLE);
+
+  G.forBlock.text_print = (b) => 'console.log(' + val(b, 'TEXT', "''") + ');\n';
+
+  G.forBlock.page_heading = (b) =>
+    "document.body.appendChild(Object.assign(document.createElement('h1'), { textContent: " + val(b, 'TEXT', "''") + ' }));\n';
+  G.forBlock.page_text = (b) =>
+    "document.body.appendChild(Object.assign(document.createElement('p'), { textContent: " + val(b, 'TEXT', "''") + ' }));\n';
+  G.forBlock.page_button = (b) => {
+    const v = fresh('button');
+    return 'var ' + v + " = document.createElement('button');\n" +
+      v + '.textContent = ' + val(b, 'TEXT', "'Button'") + ';\n' +
+      v + ".addEventListener('click', function () {\n" + G.statementToCode(b, 'DO') + '});\n' +
+      'document.body.appendChild(' + v + ');\n';
+  };
+  G.forBlock.page_input = (b) =>
+    "document.body.appendChild(Object.assign(document.createElement('input'), { id: " + idOf(b) +
+    ', placeholder: ' + G.quote_(b.getFieldValue('HINT') || '') + ' }));\n';
+  G.forBlock.page_value = (b) => ['document.getElementById(' + idOf(b) + ').value', Order.MEMBER];
+  G.forBlock.page_number = (b) => ['Number(document.getElementById(' + idOf(b) + ').value)', Order.FUNCTION_CALL];
+  G.forBlock.page_background = (b) => 'document.body.style.background = ' + val(b, 'COLOR', "'white'") + ';\n';
+  G.forBlock.page_textcolor = (b) => 'document.body.style.color = ' + val(b, 'COLOR', "'black'") + ';\n';
+  G.forBlock.page_clear = () => "document.body.innerHTML = '';\n";
+
+  G.forBlock.draw_circle = (b) => {
+    needCanvas();
+    return 'ctx.fillStyle = ' + val(b, 'COLOR', "'black'") + ';\nctx.beginPath();\n' +
+      'ctx.arc(' + val(b, 'X', '0', Order.COMMA) + ', ' + val(b, 'Y', '0', Order.COMMA) + ', ' +
+      val(b, 'R', '10', Order.COMMA) + ', 0, Math.PI * 2);\nctx.fill();\n';
+  };
+  G.forBlock.draw_rect = (b) => {
+    needCanvas();
+    return 'ctx.fillStyle = ' + val(b, 'COLOR', "'black'") + ';\n' +
+      'ctx.fillRect(' + ['X', 'Y', 'W', 'H'].map((n, i) => val(b, n, i < 2 ? '0' : '40', Order.COMMA)).join(', ') + ');\n';
+  };
+  G.forBlock.draw_text = (b) => {
+    needCanvas();
+    return 'ctx.fillStyle = ' + val(b, 'COLOR', "'black'") + ";\nctx.font = 'bold 24px sans-serif';\n" +
+      'ctx.fillText(' + val(b, 'TEXT', "''", Order.COMMA) + ', ' + val(b, 'X', '0', Order.COMMA) + ', ' + val(b, 'Y', '0', Order.COMMA) + ');\n';
+  };
+  G.forBlock.draw_clear = () => { needCanvas(); return 'ctx.clearRect(0, 0, canvas.width, canvas.height);\n'; };
+
+  G.forBlock.color_pick = (b) => [G.quote_(b.getFieldValue('COLOR')), Order.ATOMIC];
+  G.forBlock.color_random = () => ["'hsl(' + Math.floor(Math.random() * 360) + ', 85%, 60%)'", Order.ADDITION];
+
+  G.forBlock.time_every = (b) =>
+    'setInterval(function () {\n' + G.statementToCode(b, 'DO') + '}, ' + val(b, 'SECS', '1', Order.MULTIPLICATION) + ' * 1000);\n';
+  G.forBlock.time_after = (b) =>
+    'setTimeout(function () {\n' + G.statementToCode(b, 'DO') + '}, ' + val(b, 'SECS', '1', Order.MULTIPLICATION) + ' * 1000);\n';
+  G.forBlock.event_key = (b) =>
+    "document.addEventListener('keydown', function (event) {\n" +
+    G.INDENT + 'if (event.key === ' + G.quote_(b.getFieldValue('KEY')) + ') {\n' +
+    G.prefixLines(G.statementToCode(b, 'DO'), G.INDENT) + G.INDENT + '}\n});\n';
+
+  // ---------- Toolbox ----------
+  const txt = (t) => ({ shadow: { type: 'text', fields: { TEXT: t } } });
+  const num = (n) => ({ shadow: { type: 'math_number', fields: { NUM: n } } });
+  const col = (c) => ({ shadow: { type: 'color_pick', fields: { COLOR: c } } });
+  const blk = (type, inputs, extra) => Object.assign({ kind: 'block', type }, inputs ? { inputs } : {}, extra || {});
+
+  const toolbox = {
+    kind: 'categoryToolbox',
+    contents: [
+      { kind: 'category', name: 'Page', colour: HUE.page, contents: [
+        blk('page_heading', { TEXT: txt('Hello, world!') }),
+        blk('page_text', { TEXT: txt('This page was built with blocks.') }),
+        blk('page_button', { TEXT: txt('Click me') }),
+        blk('page_input'), blk('page_value'), blk('page_number'),
+        blk('page_background', { COLOR: col('#dff3ff') }),
+        blk('page_textcolor', { COLOR: col('#222222') }),
+        blk('page_clear')
+      ] },
+      { kind: 'category', name: 'Draw', colour: HUE.draw, contents: [
+        blk('draw_circle', { X: num(240), Y: num(160), R: num(40), COLOR: col('#ff5a5f') }),
+        blk('draw_rect', { X: num(40), Y: num(40), W: num(120), H: num(80), COLOR: col('#3a86ff') }),
+        blk('draw_text', { TEXT: txt('Hi!'), X: num(30), Y: num(50), COLOR: col('#222222') }),
+        blk('draw_clear')
+      ] },
+      { kind: 'category', name: 'Colors', colour: HUE.color, contents: [ blk('color_pick'), blk('color_random') ] },
+      { kind: 'category', name: 'Events', colour: HUE.event, contents: [
+        blk('time_every', { SECS: num(1) }), blk('time_after', { SECS: num(2) }), blk('event_key')
+      ] },
+      { kind: 'sep' },
+      { kind: 'category', name: 'Logic', categorystyle: 'logic_category', contents: [
+        blk('controls_if'), blk('controls_if', null, { extraState: { hasElse: true } }),
+        blk('logic_compare'), blk('logic_operation'), blk('logic_negate'), blk('logic_boolean')
+      ] },
+      { kind: 'category', name: 'Loops', categorystyle: 'loop_category', contents: [
+        blk('controls_repeat_ext', { TIMES: num(10) }), blk('controls_whileUntil'),
+        blk('controls_for', { FROM: num(1), TO: num(10), BY: num(1) }), blk('controls_forEach'), blk('controls_flow_statements')
+      ] },
+      { kind: 'category', name: 'Math', categorystyle: 'math_category', contents: [
+        blk('math_number'), blk('math_arithmetic', { A: num(1), B: num(1) }),
+        blk('math_random_int', { FROM: num(1), TO: num(100) }), blk('math_round', { NUM: num(3.1) }),
+        blk('math_modulo', { DIVIDEND: num(64), DIVISOR: num(10) }), blk('math_number_property', { NUMBER_TO_CHECK: num(0) })
+      ] },
+      { kind: 'category', name: 'Text', categorystyle: 'text_category', contents: [
+        blk('text'), blk('text_join'), blk('text_print', { TEXT: txt('Hello!') }), blk('text_length', { VALUE: txt('abc') }),
+        blk('text_changeCase', { TEXT: txt('shout') })
+      ] },
+      { kind: 'category', name: 'Lists', categorystyle: 'list_category', contents: [
+        blk('lists_create_with'), blk('lists_length'), blk('lists_getIndex'), blk('lists_setIndex')
+      ] },
+      { kind: 'category', name: 'Variables', categorystyle: 'variable_category', custom: 'VARIABLE' },
+      { kind: 'category', name: 'Functions', categorystyle: 'procedure_category', custom: 'PROCEDURE' }
+    ]
+  };
+
+  // ---------- Theme (follows the page's light/dark tokens) ----------
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  function makeTheme() {
+    const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark');
+    return Blockly.Theme.defineTheme(dark ? 'snapDark' : 'snapLight', {
+      base: Blockly.Themes.Classic,
+      componentStyles: {
+        workspaceBackgroundColour: css('--ws-bg'),
+        toolboxBackgroundColour: css('--surface-2'),
+        toolboxForegroundColour: css('--ink'),
+        flyoutBackgroundColour: css('--surface'),
+        flyoutForegroundColour: css('--ink'),
+        flyoutOpacity: 0.97,
+        scrollbarColour: css('--line'),
+        scrollbarOpacity: 0.9,
+        insertionMarkerColour: css('--ink'),
+        insertionMarkerOpacity: 0.25,
+        cursorColour: css('--accent')
+      },
+      fontStyle: { family: 'Figtree, system-ui, sans-serif', weight: '700', size: 11 },
+      startHats: false
+    });
+  }
+
+  const ws = Blockly.inject('blocks', {
+    toolbox,
+    renderer: 'zelos',
+    theme: makeTheme(),
+    media: 'media/',
+    sounds: false,
+    trashcan: true,
+    grid: { spacing: 24, length: 2, colour: css('--ws-grid'), snap: false },
+    zoom: { controls: true, wheel: true, startScale: 0.78, maxScale: 2, minScale: 0.35, scaleSpeed: 1.15 },
+    move: { scrollbars: true, drag: true, wheel: false }
+  });
+
+  function retheme() {
+    ws.setTheme(makeTheme());
+    const grid = ws.getGrid && ws.getGrid();
+    document.querySelectorAll('#blocks .blocklyGridPattern line, #blocks pattern line').forEach((l) => l.setAttribute('stroke', css('--ws-grid')));
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', retheme);
+  new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  new ResizeObserver(() => Blockly.svgResize(ws)).observe(document.getElementById('blocks'));
+
+  // ---------- Examples ----------
+  const T = (s) => '<block type="text"><field name="TEXT">' + s + '</field></block>';
+  const N = (n) => '<block type="math_number"><field name="NUM">' + n + '</field></block>';
+  const C = (c) => '<block type="color_pick"><field name="COLOR">' + c + '</field></block>';
+  const V = (id, name) => '<block type="variables_get"><field name="VAR" id="' + id + '">' + name + '</field></block>';
+  const RND = (a, b) => '<block type="math_random_int"><value name="FROM">' + N(a) + '</value><value name="TO">' + N(b) + '</value></block>';
+  const ARITH = (op, a, b) => '<block type="math_arithmetic"><field name="OP">' + op + '</field><value name="A">' + a + '</value><value name="B">' + b + '</value></block>';
+  const JOIN = (a, b) => '<block type="text_join"><mutation items="2"></mutation><value name="ADD0">' + a + '</value><value name="ADD1">' + b + '</value></block>';
+  const ROUND = (x) => '<block type="math_round"><field name="OP">ROUND</field><value name="NUM">' + x + '</value></block>';
+  // chain(...) nests statement blocks with <next>
+  const chain = (...parts) => parts.reduceRight((rest, p) => p.replace('%NEXT%', rest ? '<next>' + rest + '</next>' : ''), '');
+  const S = (type, inner) => '<block type="' + type + '">' + (inner || '') + '%NEXT%</block>';
+  const setVar = (id, name, value) => S('variables_set', '<field name="VAR" id="' + id + '">' + name + '</field><value name="VALUE">' + value + '</value>');
+  const changeVar = (id, name, by) => S('math_change', '<field name="VAR" id="' + id + '">' + name + '</field><value name="DELTA">' + N(by) + '</value>');
+  const head = (t) => S('page_heading', '<value name="TEXT">' + t + '</value>');
+  const para = (t) => S('page_text', '<value name="TEXT">' + t + '</value>');
+  const bg = (c) => S('page_background', '<value name="COLOR">' + c + '</value>');
+  const button = (label, body) => S('page_button', '<value name="TEXT">' + T(label) + '</value><statement name="DO">' + body + '</statement>');
+  const input = (name, hint) => S('page_input', '<field name="NAME">' + name + '</field><field name="HINT">' + hint + '</field>');
+  const boxNum = (name) => '<block type="page_number"><field name="NAME">' + name + '</field></block>';
+  const call = (name) => S('procedures_callnoreturn', '<mutation name="' + name + '"></mutation>');
+  const at = (x, y, inner) => inner.replace('<block ', '<block x="' + x + '" y="' + y + '" ');
+  const circle = (x, y, r, c) => S('draw_circle', '<value name="X">' + x + '</value><value name="Y">' + y + '</value><value name="R">' + r + '</value><value name="COLOR">' + c + '</value>');
+
+  const EXAMPLES = {
+    hello: '<xml><variables><variable id="vc">clicks</variable></variables>' + at(30, 30, chain(
+      setVar('vc', 'clicks', N(0)),
+      bg(C('#fff4d6')),
+      head(T('My first page 👋')),
+      para(T('Built with blocks, running as real JavaScript.')),
+      button('Click me!', chain(
+        changeVar('vc', 'clicks', 1),
+        para(JOIN(T('Clicks so far: '), V('vc', 'clicks')))
+      ))
+    )) + '</xml>',
+
+    tip: '<xml><variables><variable id="vt">tip</variable></variables>' + at(30, 30, chain(
+      bg(C('#e3fcef')),
+      head(T('Tip calculator')),
+      para(T('Bill amount ($)')),
+      input('bill', 'e.g. 48.50'),
+      para(T('Tip percent')),
+      input('percent', 'e.g. 18'),
+      button('Calculate', chain(
+        setVar('vt', 'tip', ARITH('DIVIDE', ROUND(ARITH('MULTIPLY', boxNum('bill'), boxNum('percent'))), N(100))),
+        para(JOIN(T('Tip: $'), V('vt', 'tip'))),
+        para(JOIN(T('Total: $'), ARITH('DIVIDE', ROUND(ARITH('MULTIPLY', ARITH('ADD', boxNum('bill'), V('vt', 'tip')), N(100))), N(100))))
+      ))
+    )) + '</xml>',
+
+    confetti: '<xml>' +
+      at(30, 30, chain(
+        head(T('Confetti! 🎉')),
+        call('confetti'),
+        button('More confetti', call('confetti'))
+      )) +
+      at(30, 300, '<block type="procedures_defnoreturn"><field name="NAME">confetti</field><statement name="STACK">' +
+        S('controls_repeat_ext', '<value name="TIMES">' + N(80) + '</value><statement name="DO">' +
+          circle(RND(0, 480), RND(0, 320), RND(4, 26), '<block type="color_random"></block>') +
+        '</statement>').replace('%NEXT%', '') +
+      '</statement></block>') + '</xml>',
+
+    countdown: '<xml><variables><variable id="vn">count</variable></variables>' + at(30, 30, chain(
+      setVar('vn', 'count', N(5)),
+      head(T('Get ready…')),
+      S('time_every', '<value name="SECS">' + N(1) + '</value><statement name="DO">' + chain(
+        S('page_clear'),
+        bg('<block type="color_random"></block>'),
+        S('controls_if', '<mutation else="1"></mutation><value name="IF0"><block type="logic_compare"><field name="OP">GT</field><value name="A">' + V('vn', 'count') + '</value><value name="B">' + N(0) + '</value></block></value>' +
+          '<statement name="DO0">' + chain(head(V('vn', 'count')), changeVar('vn', 'count', -1)) + '</statement>' +
+          '<statement name="ELSE">' + head(T('🚀 Liftoff!')).replace('%NEXT%', '') + '</statement>')
+      ) + '</statement>')
+    )) + '</xml>',
+
+    mover: '<xml><variables><variable id="vx">x</variable><variable id="vy">y</variable></variables>' +
+      at(30, 30, chain(
+        para(T('Click here, then press the arrow keys to move the dot.')),
+        setVar('vx', 'x', N(240)),
+        setVar('vy', 'y', N(160)),
+        call('draw dot'),
+        S('event_key', '<field name="KEY">ArrowLeft</field><statement name="DO">' + chain(changeVar('vx', 'x', -15), call('draw dot')) + '</statement>'),
+        S('event_key', '<field name="KEY">ArrowRight</field><statement name="DO">' + chain(changeVar('vx', 'x', 15), call('draw dot')) + '</statement>'),
+        S('event_key', '<field name="KEY">ArrowUp</field><statement name="DO">' + chain(changeVar('vy', 'y', -15), call('draw dot')) + '</statement>'),
+        S('event_key', '<field name="KEY">ArrowDown</field><statement name="DO">' + chain(changeVar('vy', 'y', 15), call('draw dot')) + '</statement>')
+      )) +
+      at(460, 30, '<block type="procedures_defnoreturn"><field name="NAME">draw dot</field><statement name="STACK">' + chain(
+        S('draw_clear'),
+        S('draw_rect', '<value name="X">' + N(0) + '</value><value name="Y">' + N(0) + '</value><value name="W">' + N(480) + '</value><value name="H">' + N(320) + '</value><value name="COLOR">' + C('#dff3ff') + '</value>'),
+        circle(V('vx', 'x'), V('vy', 'y'), N(22), C('#ff9f1c'))
+      ) + '</statement></block>') + '</xml>'
+  };
+
+  function fitView() {
+    ws.zoomToFit();
+    const s = Math.min(0.85, Math.max(0.5, ws.scale));
+    if (s !== ws.scale) ws.setScale(s);
+    ws.scrollCenter();
+  }
+
+  function loadXml(xml) {
+    ws.clear();
+    Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml), ws);
+    fitView();
+  }
+
+  // ---------- Code view ----------
+  const codeEl = document.getElementById('code');
+  const tally = document.getElementById('tally');
+  let lastLines = [];
+  let currentCode = '';
+
+  function generate(withTrap) {
+    G.INFINITE_LOOP_TRAP = withTrap
+      ? "if (--LoopTrap < 0) throw new Error('A loop ran over a million times, so it was stopped. Is it a forever loop?');\n"
+      : null;
+    const code = G.workspaceToCode(ws).replace(/^\s*\/\/ Describe this function\.\.\.\n/gm, '');
+    G.INFINITE_LOOP_TRAP = null;
+    return code.trim();
+  }
+
+  function esc(s) { return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+  function renderCode(code) {
+    const blocks = ws.getAllBlocks(false).filter((b) => !b.isShadow()).length;
+    const lines = code ? code.split('\n') : [];
+    tally.innerHTML = '<b>' + blocks + '</b> block' + (blocks === 1 ? '' : 's') + ' became <b>' + lines.length + '</b> line' + (lines.length === 1 ? '' : 's') + ' of JavaScript';
+    if (!code) {
+      codeEl.innerHTML = '<div class="empty"><strong>Your JavaScript appears here.</strong><br>Drag a block out of a category on the left, or pick one of the examples at the top.</div>';
+      lastLines = [];
+      return;
+    }
+    let html;
+    try { html = window.hljs ? hljs.highlight(code, { language: 'javascript' }).value : esc(code); }
+    catch (e) { html = esc(code); }
+    const old = new Set(lastLines);
+    codeEl.innerHTML = html.split('\n').map((h, i) =>
+      '<span class="ln' + (lastLines.length && !old.has(lines[i]) ? ' fresh' : '') + '">' + (h || ' ') + '</span>'
+    ).join('');
+    lastLines = lines;
+  }
+
+  // ---------- Running ----------
+  const stage = document.getElementById('stage');
+  const logEl = document.getElementById('log');
+  const runState = document.getElementById('runState');
+
+  const PAGE_STYLE =
+    'body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;padding:20px;color:#1f2233;background:#ffffff;line-height:1.5}' +
+    'h1{font-size:30px;margin:0 0 10px;line-height:1.15}p{margin:0 0 10px;font-size:16px}' +
+    'button{font:inherit;font-weight:600;padding:9px 16px;border-radius:10px;border:0;background:#2f80ed;color:#fff;cursor:pointer;margin:0 8px 10px 0}' +
+    'button:active{transform:translateY(1px)}' +
+    'input{font:inherit;padding:8px 10px;border:1.5px solid #c9cde0;border-radius:8px;margin:0 0 10px;display:block;width:min(260px,100%);box-sizing:border-box;background:#fff;color:#1f2233}' +
+    'canvas{display:block;max-width:100%;height:auto;border-radius:10px;background:#f4f5fa;margin:0 0 10px}';
+
+  function pageHtml(code, forPreview) {
+    const safe = code.replace(/<\/(script)/gi, '<\\/$1');
+    const bridge = forPreview
+      ? '<script>(function(){function f(v){if(typeof v==="string")return v;try{return JSON.stringify(v)}catch(e){return String(v)}}' +
+        'function s(t,a){parent.postMessage({snapcode:1,type:t,text:Array.prototype.map.call(a,f).join(" ")},"*")}' +
+        'console.log=function(){s("log",arguments)};console.info=console.log;console.warn=console.log;' +
+        'console.error=function(){s("error",arguments)};window.alert=function(m){s("log",[m])};' +
+        'window.onerror=function(m){s("error",[String(m).replace(/^Uncaught (Error: )?/,"")]);return true};' +
+        'document.addEventListener("pointerdown",function(){window.focus()});})();<\/script>\n<script>var LoopTrap = 1000000;<\/script>\n'
+      : '';
+    return '<!doctype html>\n<html>\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
+      '<title>My Snapcode page</title>\n<style>' + PAGE_STYLE + '</style>\n</head>\n<body>\n' + bridge +
+      '<script>\n' + safe + '\n<\/script>\n</body>\n</html>\n';
+  }
+
+  function log(text, kind) {
+    const quiet = logEl.querySelector('.quiet');
+    if (quiet) quiet.remove();
+    const li = document.createElement('li');
+    if (kind) li.className = kind;
+    li.textContent = text;
+    logEl.appendChild(li);
+    while (logEl.children.length > 300) logEl.firstChild.remove();
+    const box = document.getElementById('consoleBox');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  window.addEventListener('message', (e) => {
+    if (e.source !== stage.contentWindow || !e.data || !e.data.snapcode) return;
+    log(e.data.text, e.data.type === 'error' ? 'error' : '');
+  });
+
+  function run() {
+    const code = generate(true);
+    logEl.innerHTML = '';
+    if (!code) {
+      stage.srcdoc = pageHtml('', true);
+      logEl.innerHTML = '<li class="quiet">Nothing to run yet. Add some blocks first.</li>';
+      runState.textContent = 'empty';
+      return;
+    }
+    stage.srcdoc = pageHtml(code, true);
+    runState.textContent = 'ran at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  }
+
+  // ---------- Wiring ----------
+  const autorun = document.getElementById('autorun');
+  let genTimer = 0, runTimer = 0;
+
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(Blockly.serialization.workspaces.save(ws))); } catch (e) {}
+  }
+  function refresh() {
+    currentCode = generate(false);
+    renderCode(currentCode);
+    save();
+    if (autorun.checked) { clearTimeout(runTimer); runTimer = setTimeout(run, 500); }
+  }
+
+  ws.addChangeListener((e) => {
+    if (e.isUiEvent || e.type === Blockly.Events.FINISHED_LOADING) return;
+    if (ws.isDragging()) return;
+    clearTimeout(genTimer);
+    genTimer = setTimeout(refresh, 120);
+  });
+
+  try { autorun.checked = localStorage.getItem('snapcode-autorun') !== '0'; } catch (e) {}
+  autorun.addEventListener('change', () => {
+    try { localStorage.setItem('snapcode-autorun', autorun.checked ? '1' : '0'); } catch (e) {}
+    if (autorun.checked) run();
+  });
+
+  document.getElementById('run').addEventListener('click', run);
+  document.getElementById('restart').addEventListener('click', run);
+  document.getElementById('clearLog').addEventListener('click', () => { logEl.innerHTML = ''; });
+
+  document.getElementById('examples').addEventListener('change', (e) => {
+    const key = e.target.value;
+    if (!key) return;
+    loadXml(EXAMPLES[key]);
+    e.target.value = '';
+    clearTimeout(genTimer);
+    refresh();
+    run();
+    toast('Loaded “' + e.target.querySelector('option[value="' + key + '"]').textContent + '”');
+  });
+
+  const clearBtn = document.getElementById('clear');
+  let armed = 0;
+  clearBtn.addEventListener('click', () => {
+    if (!armed) {
+      clearBtn.textContent = 'Clear all blocks?';
+      clearBtn.classList.add('danger-armed');
+      armed = setTimeout(disarm, 3000);
+      return;
+    }
+    disarm();
+    ws.clear();
+    refresh();
+    run();
+    toast('Workspace cleared');
+  });
+  function disarm() { clearTimeout(armed); armed = 0; clearBtn.textContent = 'Clear'; clearBtn.classList.remove('danger-armed'); }
+
+  const toastEl = document.getElementById('toast');
+  let toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1900);
+  }
+
+  async function copy(text, label) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(label);
+    } catch (e) {
+      const sel = window.getSelection(), range = document.createRange();
+      range.selectNodeContents(codeEl);
+      sel.removeAllRanges(); sel.addRange(range);
+      toast('Copy was blocked. The code is selected, so press Ctrl+C or ⌘C.');
+    }
+  }
+  document.getElementById('copyJs').addEventListener('click', () => {
+    if (!currentCode) return toast('Add some blocks first');
+    copy(currentCode + '\n', 'JavaScript copied');
+  });
+  document.getElementById('copyHtml').addEventListener('click', () => {
+    if (!currentCode) return toast('Add some blocks first');
+    copy(pageHtml(currentCode, false), 'Web page copied. Paste it into a file ending in .html');
+  });
+
+  // ---------- Start ----------
+  let restored = false;
+  try {
+    const saved = localStorage.getItem(STORE_KEY);
+    if (saved) {
+      const state = JSON.parse(saved);
+      if (state && state.blocks && state.blocks.blocks && state.blocks.blocks.length) {
+        Blockly.serialization.workspaces.load(state, ws);
+        fitView();
+        restored = true;
+      }
+    }
+  } catch (e) { restored = false; }
+  if (!restored) loadXml(EXAMPLES.hello);
+  currentCode = generate(false);
+  renderCode(currentCode);
+  run();
+})();
+</script>
+</body>
+</html>
