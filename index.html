@@ -264,6 +264,37 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
 .blocklyTreeLabel, .blocklyToolboxCategoryLabel { font-weight: 600; }
 .blocklyMainBackground { stroke: none !important; }
 
+/* In-page dialog (browser pop-ups are blocked in some viewers) */
+.modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: grid; place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--ink) 35%, transparent);
+}
+.modal[hidden], .modal-card [hidden] { display: none !important; }
+.modal-card {
+  width: min(380px, 100%);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  display: grid; gap: 12px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .25);
+}
+.modal-card p { margin: 0; font-weight: 600; font-size: 15px; line-height: 1.4; }
+.modal-card input {
+  font: inherit; font-size: 15px;
+  padding: 9px 11px;
+  border: 1.5px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--ink);
+  width: 100%; box-sizing: border-box;
+}
+.modal-card input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
 @media (max-width: 860px) {
   body { overflow: auto; height: auto; min-height: 100%; }
   main { grid-template-columns: minmax(0, 1fr); }
@@ -344,6 +375,17 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
 </main>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal" id="modal" hidden>
+  <form class="modal-card" id="modalForm" role="dialog" aria-modal="true" aria-labelledby="modalMsg">
+    <p id="modalMsg"></p>
+    <input id="modalInput" type="text" autocomplete="off" spellcheck="false" aria-labelledby="modalMsg">
+    <div class="modal-actions">
+      <button type="button" id="modalCancel" class="ghost">Cancel</button>
+      <button type="submit" id="modalOk" class="run">OK</button>
+    </div>
+  </form>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/blockly@11.1.1/blockly.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -566,6 +608,47 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
       startHats: false
     });
   }
+
+  // ---------- In-page dialogs ----------
+  // Blockly normally uses window.prompt/confirm/alert (e.g. "Create variable…"),
+  // which some viewers block silently. Replace them with a dialog in the page.
+  const modal = document.getElementById('modal');
+  const modalForm = document.getElementById('modalForm');
+  const modalMsg = document.getElementById('modalMsg');
+  const modalInput = document.getElementById('modalInput');
+  const modalCancel = document.getElementById('modalCancel');
+  let modalDone = null;
+
+  function openModal(message, opts, done) {
+    if (modalDone) closeModal(null);
+    modalMsg.textContent = message;
+    modalInput.hidden = !opts.input;
+    modalInput.value = opts.value || '';
+    modalCancel.hidden = !!opts.alertOnly;
+    modalDone = done;
+    modal.hidden = false;
+    setTimeout(() => (opts.input ? (modalInput.focus(), modalInput.select()) : document.getElementById('modalOk').focus()), 0);
+  }
+  function closeModal(result) {
+    const done = modalDone;
+    modalDone = null;
+    modal.hidden = true;
+    if (done) done(result);
+  }
+  modalForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    closeModal(modalInput.hidden ? true : modalInput.value);
+  });
+  modalCancel.addEventListener('click', () => closeModal(null));
+  modal.addEventListener('pointerdown', (e) => { if (e.target === modal) closeModal(null); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) closeModal(null); });
+
+  Blockly.dialog.setPrompt((message, defaultValue, callback) =>
+    openModal(message, { input: true, value: defaultValue }, (v) => callback(v)));
+  Blockly.dialog.setConfirm((message, callback) =>
+    openModal(message, {}, (v) => callback(v === true)));
+  Blockly.dialog.setAlert((message, callback) =>
+    openModal(message, { alertOnly: true }, () => { if (callback) callback(); }));
 
   const ws = Blockly.inject('blocks', {
     toolbox,
