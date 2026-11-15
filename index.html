@@ -329,6 +329,9 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
       <option value="confetti">Confetti art</option>
       <option value="countdown">Rocket countdown</option>
       <option value="mover">Arrow-key dot game</option>
+      <option value="paint">Paint with the mouse</option>
+      <option value="music">Music box</option>
+      <option value="clock">Live clock</option>
     </select>
     <label class="switch" title="Run your program every time you change a block">
       <input type="checkbox" id="autorun" checked>
@@ -360,11 +363,11 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
 
     <section class="panel preview-panel" aria-label="Preview">
       <div class="panel-head">
-        <h2><span class="dot" style="background:var(--ok)"></span>Preview <span class="hint" id="runState">not run yet</span></h2>
+        <h2><span class="dot" style="background:var(--ok)"></span>Preview <span class="hint" id="runState">not run yet</span> <span class="hint" id="tabTitle"></span></h2>
         <button id="restart">Restart</button>
       </div>
       <div class="preview-body">
-        <iframe id="stage" title="Your running program" sandbox="allow-scripts"></iframe>
+        <iframe id="stage" title="Your running program" sandbox="allow-scripts allow-popups"></iframe>
         <div class="console" id="consoleBox">
           <div class="console-label">Console <button id="clearLog">Clear</button></div>
           <ol id="log"><li class="quiet">Messages from “log” blocks and any errors show up here.</li></ol>
@@ -460,22 +463,97 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
       previousStatement: null, nextStatement: null, colour: HUE.event, tooltip: 'Waits, then runs the blocks inside once.' },
     { type: 'event_key', message0: 'when key %1 is pressed', args0: [{ type: 'field_dropdown', name: 'KEY', options: [
         ['← left arrow', 'ArrowLeft'], ['→ right arrow', 'ArrowRight'], ['↑ up arrow', 'ArrowUp'], ['↓ down arrow', 'ArrowDown'],
-        ['space', ' '], ['enter', 'Enter']] }],
+        ['space', ' '], ['enter', 'Enter'], ['W', 'w'], ['A', 'a'], ['S', 's'], ['D', 'd']] }],
       message1: 'do %1', args1: [{ type: 'input_statement', name: 'DO' }],
       previousStatement: null, nextStatement: null, colour: HUE.event,
       tooltip: 'Runs the blocks inside when that key is pressed. Click the preview first so it can hear the keyboard.' }
   ]);
 
+  HUE.sense = '#5cb1d6';
+  HUE.sound = '#cf63cf';
+  const NOTES = [['C', '262'], ['D', '294'], ['E', '330'], ['F', '349'], ['G', '392'], ['A', '440'], ['B', '494'],
+                 ['high C', '523'], ['high D', '587'], ['high E', '659'], ['high G', '784']];
+  const stmt = (type, message0, args0, colour, tooltip, extra) =>
+    Object.assign({ type, message0, args0: args0 || [], previousStatement: null, nextStatement: null, colour, tooltip }, extra || {});
+  const vin = (name, check) => Object.assign({ type: 'input_value', name }, check ? { check } : {});
+  const drop = (name, options) => ({ type: 'field_dropdown', name, options });
+
+  Blockly.defineBlocksWithJsonArray([
+    // Page
+    stmt('page_title', 'set page title to %1', [vin('TEXT')], HUE.page, 'Changes the title shown on the browser tab.'),
+    stmt('page_refresh', 'refresh the page', [], HUE.page, 'Reloads the page so the program starts over. Put it inside a button, or it will refresh forever.'),
+    stmt('page_subheading', 'add small heading %1', [vin('TEXT')], HUE.page, 'Adds a smaller title.'),
+    stmt('page_link', 'add link %1 to %2', [vin('TEXT'), vin('URL')], HUE.page, 'Adds a link that opens a website in a new tab.', { inputsInline: true }),
+    stmt('page_emoji', 'add emoji %1 size %2', [vin('TEXT'), vin('SIZE', 'Number')], HUE.page, 'Adds a big emoji (or any text) to the page.', { inputsInline: true }),
+    stmt('page_list', 'add bullet list of %1', [vin('LIST', 'Array')], HUE.page, 'Adds a bulleted list with one bullet for each item.'),
+    stmt('page_divider', 'add divider line', [], HUE.page, 'Adds a horizontal line.'),
+    stmt('page_popup', 'show popup message %1', [vin('TEXT')], HUE.page, 'Pops up a message with an OK button.'),
+    stmt('page_canvas', 'add the drawing area here', [], HUE.page, 'Puts the drawing area at this spot. Without this block it goes at the bottom of the page.'),
+    stmt('page_set_box', 'set box %1 to %2', [{ type: 'field_input', name: 'NAME', text: 'answer' }, vin('TEXT')], HUE.page, 'Puts text into an input box.'),
+    stmt('page_font', 'set font to %1', [drop('FONT', [
+      ['friendly', 'system-ui, sans-serif'], ['fancy serif', 'Georgia, serif'], ['typewriter', '"Courier New", monospace'],
+      ['handwriting', '"Comic Sans MS", "Comic Neue", cursive'], ['impact', 'Impact, "Arial Black", sans-serif']])], HUE.page, 'Changes the font of all the text.'),
+    stmt('page_size', 'set text size to %1', [vin('SIZE', 'Number')], HUE.page, 'Changes how big the text is, in pixels.'),
+    stmt('page_align', 'line things up on the %1', [drop('ALIGN', [['left', 'left'], ['center', 'center'], ['right', 'right']])], HUE.page, 'Lines up text to the left, center or right.'),
+    stmt('page_last_color', 'color the last thing %1', [vin('COLOR')], HUE.page, 'Changes the text color of whatever was added last.'),
+    stmt('page_last_style', 'make the last thing %1', [drop('STYLE', [
+      ['bigger', "fontSize = '1.6em'"], ['smaller', "fontSize = '0.8em'"], ['bold', "fontWeight = 'bold'"],
+      ['italic', "fontStyle = 'italic'"], ['underlined', "textDecoration = 'underline'"],
+      ['tilted', "transform = 'rotate(-4deg)'"], ['see-through', "opacity = '0.5'"], ['hidden', "display = 'none'"]])],
+      HUE.page, 'Changes the style of whatever was added last.'),
+
+    // Sensing
+    { type: 'sense_mouse', message0: 'mouse %1', args0: [drop('AXIS', [['x', 'X'], ['y', 'Y']])], output: 'Number', colour: HUE.sense,
+      tooltip: 'Where the mouse is. Over the drawing area this matches drawing positions.' },
+    { type: 'sense_mouse_down', message0: 'mouse button is down', output: 'Boolean', colour: HUE.sense, tooltip: 'True while the mouse button (or a finger) is pressed.' },
+    { type: 'sense_time', message0: 'current %1', args0: [drop('PART', [
+        ['hour', 'getHours()'], ['minute', 'getMinutes()'], ['second', 'getSeconds()'], ['day of month', 'getDate()'],
+        ['month', 'getMonth() + 1'], ['year', 'getFullYear()'], ['day of week (0 = Sunday)', 'getDay()']])],
+      output: 'Number', colour: HUE.sense, tooltip: 'A part of the current date or time.' },
+    { type: 'sense_clock', message0: 'the time as text', output: 'String', colour: HUE.sense, tooltip: 'The current time, like 3:45:12 PM.' },
+    { type: 'sense_timer', message0: 'seconds since start', output: 'Number', colour: HUE.sense, tooltip: 'How long the program has been running.' },
+    { type: 'sense_title', message0: 'page title', output: 'String', colour: HUE.sense, tooltip: 'The title on the browser tab.' },
+
+    // Events
+    { type: 'event_mouse', message0: 'when the mouse %1', args0: [drop('TYPE', [
+        ['moves', 'pointermove'], ['clicks', 'click'], ['presses down', 'pointerdown'], ['lets go', 'pointerup']])],
+      message1: 'do %1', args1: [{ type: 'input_statement', name: 'DO' }], previousStatement: null, nextStatement: null,
+      colour: HUE.event, tooltip: 'Runs the blocks inside when the mouse does something on the page.' },
+    stmt('time_stop_all', 'stop all timers', [], HUE.event, 'Stops every “every N seconds” and “after N seconds” block.'),
+
+    // Draw
+    stmt('draw_line', 'draw line from x %1 y %2 to x %3 y %4 color %5 thickness %6',
+      [vin('X1', 'Number'), vin('Y1', 'Number'), vin('X2', 'Number'), vin('Y2', 'Number'), vin('COLOR'), vin('W', 'Number')],
+      HUE.draw, 'Draws a straight line.', { inputsInline: true }),
+    stmt('draw_fill', 'fill the drawing with %1', [vin('COLOR')], HUE.draw, 'Paints the whole drawing area one color.'),
+    stmt('draw_emoji', 'draw emoji %1 at x %2 y %3 size %4', [vin('TEXT'), vin('X', 'Number'), vin('Y', 'Number'), vin('SIZE', 'Number')],
+      HUE.draw, 'Draws an emoji centered on x and y. Great for game characters.', { inputsInline: true }),
+
+    // Colors
+    { type: 'color_rgb', message0: 'color red %1 green %2 blue %3', args0: [vin('R', 'Number'), vin('G', 'Number'), vin('B', 'Number')],
+      inputsInline: true, output: 'String', colour: HUE.color, tooltip: 'Mix a color. Each amount goes from 0 to 255.' },
+
+    // Sound
+    stmt('sound_note', 'play note %1 for %2 seconds', [drop('NOTE', NOTES), vin('SECS', 'Number')], HUE.sound,
+      'Plays a note. Notes play one after another, so you can write a tune. Sound starts after you click something.', { inputsInline: true }),
+    stmt('sound_rest', 'rest for %1 seconds', [vin('SECS', 'Number')], HUE.sound, 'A pause between notes.'),
+    stmt('sound_effect', 'play sound effect %1', [drop('FX', [['coin', 'coin'], ['laser', 'laser'], ['jump', 'jump'], ['boom', 'boom']])],
+      HUE.sound, 'Plays a quick game sound right away.'),
+    stmt('sound_speak', 'say out loud %1', [vin('TEXT')], HUE.sound, 'The computer reads the text out loud.')
+  ]);
+
   // ---------- Generators: blocks -> real, portable JavaScript ----------
-  G.addReservedWords('canvas,ctx,event');
+  G.addReservedWords('canvas,ctx,event,mouseX,mouseY,mouseDown,audioContext');
   const val = (b, name, fallback, order) => G.valueToCode(b, name, order || Order.NONE) || fallback;
   const idOf = (b) => G.quote_(String(b.getFieldValue('NAME') || 'box').trim().replace(/[^\w-]/g, '_') || 'box');
   const needCanvas = () => {
     G.definitions_['canvas'] =
       "var canvas = document.createElement('canvas');\n" +
       'canvas.width = 480;\ncanvas.height = 320;\n' +
-      'document.body.appendChild(canvas);\n' +
-      "var ctx = canvas.getContext('2d');";
+      "var ctx = canvas.getContext('2d');\n" +
+      '// Put the drawing area at the end of the page, unless a block already placed it\n' +
+      "document.addEventListener('DOMContentLoaded', function () {\n" +
+      '  if (!canvas.isConnected) document.body.appendChild(canvas);\n});';
   };
   const fresh = (base) => G.nameDB_.getDistinctName(base, Blockly.Names.NameType.VARIABLE);
 
@@ -531,6 +609,147 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
     G.INDENT + 'if (event.key === ' + G.quote_(b.getFieldValue('KEY')) + ') {\n' +
     G.prefixLines(G.statementToCode(b, 'DO'), G.INDENT) + G.INDENT + '}\n});\n';
 
+  const needMouse = () => {
+    G.definitions_['mouse'] =
+      'var mouseX = 0;\nvar mouseY = 0;\nvar mouseDown = false;\n' +
+      "['pointermove', 'pointerdown', 'pointerup'].forEach(function (type) {\n" +
+      '  document.addEventListener(type, function (event) {\n' +
+      "    if (type === 'pointerdown') mouseDown = true;\n" +
+      "    if (type === 'pointerup') mouseDown = false;\n" +
+      "    var target = canvasOrBody();\n" +
+      '    var box = target.getBoundingClientRect();\n' +
+      '    mouseX = Math.round((event.clientX - box.left) * (target.width || box.width) / box.width);\n' +
+      '    mouseY = Math.round((event.clientY - box.top) * (target.height || box.height) / box.height);\n' +
+      '  }, true);\n});\n' +
+      'function canvasOrBody() {\n' +
+      "  var found = document.querySelector('canvas');\n" +
+      '  return found && found.isConnected ? found : document.body;\n}';
+  };
+  const audioHelper = () => G.provideFunction_('getAudio', `
+function ${G.FUNCTION_NAME_PLACEHOLDER_}() {
+  if (!window.audioContext) window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  return window.audioContext;
+}`);
+
+  G.forBlock.page_title = (b) => 'document.title = ' + val(b, 'TEXT', "''") + ';\n';
+  G.forBlock.page_refresh = () => 'location.reload();\n';
+  G.forBlock.page_subheading = (b) =>
+    "document.body.appendChild(Object.assign(document.createElement('h2'), { textContent: " + val(b, 'TEXT', "''") + ' }));\n';
+  G.forBlock.page_link = (b) =>
+    "document.body.appendChild(Object.assign(document.createElement('a'), { textContent: " + val(b, 'TEXT', "'link'") +
+    ', href: ' + val(b, 'URL', "'https://example.com'") + ", target: '_blank' }));\n";
+  G.forBlock.page_emoji = (b) =>
+    "document.body.appendChild(Object.assign(document.createElement('div'), { textContent: " + val(b, 'TEXT', "'⭐'") +
+    ", style: 'font-size: ' + " + val(b, 'SIZE', '64', Order.ADDITION) + " + 'px; line-height: 1.2' }));\n";
+  G.forBlock.page_list = (b) => {
+    const v = fresh('list');
+    return 'var ' + v + " = document.createElement('ul');\n" +
+      val(b, 'LIST', '[]', Order.MEMBER) + '.forEach(function (item) {\n' +
+      G.INDENT + v + ".appendChild(Object.assign(document.createElement('li'), { textContent: item }));\n});\n" +
+      'document.body.appendChild(' + v + ');\n';
+  };
+  G.forBlock.page_divider = () => "document.body.appendChild(document.createElement('hr'));\n";
+  G.forBlock.page_popup = (b) => 'alert(' + val(b, 'TEXT', "''") + ');\n';
+  G.forBlock.page_canvas = () => { needCanvas(); return 'document.body.appendChild(canvas);\n'; };
+  G.forBlock.page_set_box = (b) => 'document.getElementById(' + idOf(b) + ').value = ' + val(b, 'TEXT', "''") + ';\n';
+  G.forBlock.page_font = (b) => 'document.body.style.fontFamily = ' + G.quote_(b.getFieldValue('FONT')) + ';\n';
+  G.forBlock.page_size = (b) => "document.body.style.fontSize = " + val(b, 'SIZE', '16', Order.ADDITION) + " + 'px';\n";
+  G.forBlock.page_align = (b) => 'document.body.style.textAlign = ' + G.quote_(b.getFieldValue('ALIGN')) + ';\n';
+  G.forBlock.page_last_color = (b) => 'document.body.lastElementChild.style.color = ' + val(b, 'COLOR', "'black'") + ';\n';
+  G.forBlock.page_last_style = (b) => 'document.body.lastElementChild.style.' + b.getFieldValue('STYLE') + ';\n';
+
+  G.forBlock.sense_mouse = (b) => { needMouse(); return [b.getFieldValue('AXIS') === 'X' ? 'mouseX' : 'mouseY', Order.ATOMIC]; };
+  G.forBlock.sense_mouse_down = () => { needMouse(); return ['mouseDown', Order.ATOMIC]; };
+  G.forBlock.sense_time = (b) => {
+    const part = b.getFieldValue('PART');
+    return ['new Date().' + part, part.includes('+') ? Order.ADDITION : Order.FUNCTION_CALL];
+  };
+  G.forBlock.sense_clock = () => ['new Date().toLocaleTimeString()', Order.FUNCTION_CALL];
+  G.forBlock.sense_timer = () => ['Math.round(performance.now() / 100) / 10', Order.DIVISION];
+  G.forBlock.sense_title = () => ['document.title', Order.MEMBER];
+
+  G.forBlock.event_mouse = (b) => {
+    needMouse();
+    return 'document.addEventListener(' + G.quote_(b.getFieldValue('TYPE')) + ', function (event) {\n' + G.statementToCode(b, 'DO') + '});\n';
+  };
+  G.forBlock.time_stop_all = () =>
+    'for (var timerId = setTimeout(function () {}); timerId > 0; timerId--) {\n' +
+    G.INDENT + 'clearTimeout(timerId);\n' + G.INDENT + 'clearInterval(timerId);\n}\n';
+
+  G.forBlock.draw_line = (b) => {
+    needCanvas();
+    return 'ctx.strokeStyle = ' + val(b, 'COLOR', "'black'") + ';\nctx.lineWidth = ' + val(b, 'W', '4') + ";\nctx.lineCap = 'round';\n" +
+      'ctx.beginPath();\nctx.moveTo(' + val(b, 'X1', '0', Order.COMMA) + ', ' + val(b, 'Y1', '0', Order.COMMA) + ');\n' +
+      'ctx.lineTo(' + val(b, 'X2', '0', Order.COMMA) + ', ' + val(b, 'Y2', '0', Order.COMMA) + ');\nctx.stroke();\n';
+  };
+  G.forBlock.draw_fill = (b) => {
+    needCanvas();
+    return 'ctx.fillStyle = ' + val(b, 'COLOR', "'white'") + ';\nctx.fillRect(0, 0, canvas.width, canvas.height);\n';
+  };
+  G.forBlock.draw_emoji = (b) => {
+    needCanvas();
+    return "ctx.font = " + val(b, 'SIZE', '48', Order.ADDITION) + " + 'px sans-serif';\nctx.textAlign = 'center';\nctx.textBaseline = 'middle';\n" +
+      'ctx.fillText(' + val(b, 'TEXT', "'⭐'", Order.COMMA) + ', ' + val(b, 'X', '0', Order.COMMA) + ', ' + val(b, 'Y', '0', Order.COMMA) + ");\n" +
+      "ctx.textAlign = 'start';\nctx.textBaseline = 'alphabetic';\n";
+  };
+
+  G.forBlock.color_rgb = (b) =>
+    ["'rgb(' + " + val(b, 'R', '0', Order.ADDITION) + " + ', ' + " + val(b, 'G', '0', Order.ADDITION) + " + ', ' + " +
+     val(b, 'B', '0', Order.ADDITION) + " + ')'", Order.ADDITION];
+
+  const notePlayer = () => {
+    const getAudio = audioHelper();
+    return G.provideFunction_('playNote', `
+function ${G.FUNCTION_NAME_PLACEHOLDER_}(frequency, seconds) {
+  // Notes are queued, so several in a row play as a tune.
+  var audio = ${getAudio}();
+  var start = Math.max(audio.currentTime, window.nextNoteTime || 0);
+  window.nextNoteTime = start + seconds;
+  if (!frequency) return;
+  var osc = audio.createOscillator();
+  var gain = audio.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = frequency;
+  gain.gain.setValueAtTime(0.3, start);
+  gain.gain.exponentialRampToValueAtTime(0.001, start + seconds * 0.95);
+  osc.connect(gain);
+  gain.connect(audio.destination);
+  osc.start(start);
+  osc.stop(start + seconds);
+}`);
+  };
+  G.forBlock.sound_note = (b) => notePlayer() + '(' + b.getFieldValue('NOTE') + ', ' + val(b, 'SECS', '0.5', Order.COMMA) + ');\n';
+  G.forBlock.sound_rest = (b) => notePlayer() + '(0, ' + val(b, 'SECS', '0.5', Order.COMMA) + ');\n';
+  G.forBlock.sound_effect = (b) => {
+    const getAudio = audioHelper();
+    const fn = G.provideFunction_('playSoundEffect', `
+function ${G.FUNCTION_NAME_PLACEHOLDER_}(name) {
+  var sounds = {
+    coin: ['square', 988, 1976, 0.25],
+    laser: ['sawtooth', 1400, 160, 0.3],
+    jump: ['square', 260, 760, 0.22],
+    boom: ['sawtooth', 140, 30, 0.7]
+  };
+  var sound = sounds[name] || sounds.coin;
+  var audio = ${getAudio}();
+  var now = audio.currentTime;
+  var osc = audio.createOscillator();
+  var gain = audio.createGain();
+  osc.type = sound[0];
+  osc.frequency.setValueAtTime(sound[1], now);
+  osc.frequency.exponentialRampToValueAtTime(sound[2], now + sound[3]);
+  gain.gain.setValueAtTime(0.2, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + sound[3]);
+  osc.connect(gain);
+  gain.connect(audio.destination);
+  osc.start(now);
+  osc.stop(now + sound[3]);
+}`);
+    return fn + '(' + G.quote_(b.getFieldValue('FX')) + ');\n';
+  };
+  G.forBlock.sound_speak = (b) =>
+    'speechSynthesis.speak(new SpeechSynthesisUtterance(' + val(b, 'TEXT', "''") + '));\n';
+
   // ---------- Toolbox ----------
   const txt = (t) => ({ shadow: { type: 'text', fields: { TEXT: t } } });
   const num = (n) => ({ shadow: { type: 'math_number', fields: { NUM: n } } });
@@ -541,28 +760,62 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
     kind: 'categoryToolbox',
     contents: [
       { kind: 'category', name: 'Page', colour: HUE.page, contents: [
+        { kind: 'label', text: 'Add things' },
         blk('page_heading', { TEXT: txt('Hello, world!') }),
+        blk('page_subheading', { TEXT: txt('A smaller heading') }),
         blk('page_text', { TEXT: txt('This page was built with blocks.') }),
         blk('page_button', { TEXT: txt('Click me') }),
-        blk('page_input'), blk('page_value'), blk('page_number'),
+        blk('page_input'),
+        blk('page_link', { TEXT: txt('Visit Wikipedia'), URL: txt('https://wikipedia.org') }),
+        blk('page_emoji', { TEXT: txt('🦄'), SIZE: num(64) }),
+        blk('page_list', { LIST: { block: { type: 'lists_split', fields: { MODE: 'SPLIT' },
+          inputs: { INPUT: txt('apples, bananas, cherries'), DELIM: txt(', ') } } } }),
+        blk('page_divider'),
+        blk('page_canvas'),
+        blk('page_popup', { TEXT: txt('Hi there!') }),
+        { kind: 'label', text: 'Change the page' },
+        blk('page_title', { TEXT: txt('My awesome page') }),
         blk('page_background', { COLOR: col('#dff3ff') }),
         blk('page_textcolor', { COLOR: col('#222222') }),
-        blk('page_clear')
+        blk('page_font'),
+        blk('page_size', { SIZE: num(20) }),
+        blk('page_align'),
+        blk('page_last_color', { COLOR: col('#ff5a5f') }),
+        blk('page_last_style'),
+        blk('page_set_box', { TEXT: txt('') }),
+        blk('page_clear'),
+        blk('page_refresh')
       ] },
       { kind: 'category', name: 'Draw', colour: HUE.draw, contents: [
         blk('draw_circle', { X: num(240), Y: num(160), R: num(40), COLOR: col('#ff5a5f') }),
         blk('draw_rect', { X: num(40), Y: num(40), W: num(120), H: num(80), COLOR: col('#3a86ff') }),
+        blk('draw_line', { X1: num(20), Y1: num(20), X2: num(200), Y2: num(120), COLOR: col('#222222'), W: num(4) }),
+        blk('draw_emoji', { TEXT: txt('🐱'), X: num(240), Y: num(160), SIZE: num(48) }),
         blk('draw_text', { TEXT: txt('Hi!'), X: num(30), Y: num(50), COLOR: col('#222222') }),
+        blk('draw_fill', { COLOR: col('#dff3ff') }),
         blk('draw_clear')
       ] },
-      { kind: 'category', name: 'Colors', colour: HUE.color, contents: [ blk('color_pick'), blk('color_random') ] },
+      { kind: 'category', name: 'Colors', colour: HUE.color, contents: [
+        blk('color_pick'), blk('color_random'), blk('color_rgb', { R: num(255), G: num(120), B: num(0) })
+      ] },
+      { kind: 'category', name: 'Sound', colour: HUE.sound, contents: [
+        blk('sound_note', { SECS: num(0.4) }), blk('sound_rest', { SECS: num(0.4) }),
+        blk('sound_effect'), blk('sound_speak', { TEXT: txt('Hello! I am a computer.') })
+      ] },
       { kind: 'category', name: 'Events', colour: HUE.event, contents: [
-        blk('time_every', { SECS: num(1) }), blk('time_after', { SECS: num(2) }), blk('event_key')
+        blk('event_key'), blk('event_mouse'),
+        blk('time_every', { SECS: num(1) }), blk('time_after', { SECS: num(2) }), blk('time_stop_all')
+      ] },
+      { kind: 'category', name: 'Sensing', colour: HUE.sense, contents: [
+        blk('sense_mouse'), blk('sense_mouse_down'),
+        blk('page_value'), blk('page_number'),
+        blk('sense_time'), blk('sense_clock'), blk('sense_timer'), blk('sense_title')
       ] },
       { kind: 'sep' },
       { kind: 'category', name: 'Logic', categorystyle: 'logic_category', contents: [
         blk('controls_if'), blk('controls_if', null, { extraState: { hasElse: true } }),
-        blk('logic_compare'), blk('logic_operation'), blk('logic_negate'), blk('logic_boolean')
+        blk('logic_compare'), blk('logic_operation'), blk('logic_negate'), blk('logic_boolean'),
+        blk('logic_ternary'), blk('logic_null')
       ] },
       { kind: 'category', name: 'Loops', categorystyle: 'loop_category', contents: [
         blk('controls_repeat_ext', { TIMES: num(10) }), blk('controls_whileUntil'),
@@ -570,15 +823,26 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
       ] },
       { kind: 'category', name: 'Math', categorystyle: 'math_category', contents: [
         blk('math_number'), blk('math_arithmetic', { A: num(1), B: num(1) }),
-        blk('math_random_int', { FROM: num(1), TO: num(100) }), blk('math_round', { NUM: num(3.1) }),
-        blk('math_modulo', { DIVIDEND: num(64), DIVISOR: num(10) }), blk('math_number_property', { NUMBER_TO_CHECK: num(0) })
+        blk('math_random_int', { FROM: num(1), TO: num(100) }), blk('math_random_float'),
+        blk('math_round', { NUM: num(3.1) }), blk('math_single', { NUM: num(9) }),
+        blk('math_modulo', { DIVIDEND: num(64), DIVISOR: num(10) }), blk('math_number_property', { NUMBER_TO_CHECK: num(0) }),
+        blk('math_constrain', { VALUE: num(50), LOW: num(1), HIGH: num(100) }),
+        blk('math_trig', { NUM: num(45) }), blk('math_constant'), blk('math_on_list')
       ] },
       { kind: 'category', name: 'Text', categorystyle: 'text_category', contents: [
-        blk('text'), blk('text_join'), blk('text_print', { TEXT: txt('Hello!') }), blk('text_length', { VALUE: txt('abc') }),
-        blk('text_changeCase', { TEXT: txt('shout') })
+        blk('text'), blk('text_join'), blk('text_print', { TEXT: txt('Hello!') }),
+        blk('text_length', { VALUE: txt('abc') }), blk('text_isEmpty', { VALUE: txt('') }),
+        blk('text_changeCase', { TEXT: txt('shout') }), blk('text_trim', { TEXT: txt('  tidy  ') }),
+        blk('text_indexOf', { FIND: txt('a') }), blk('text_charAt'), blk('text_getSubstring'),
+        blk('text_count', { SUB: txt('a'), TEXT: txt('banana') }),
+        blk('text_replace', { FROM: txt('cats'), TO: txt('dogs'), TEXT: txt('I love cats') }),
+        blk('text_reverse', { TEXT: txt('stressed') })
       ] },
       { kind: 'category', name: 'Lists', categorystyle: 'list_category', contents: [
-        blk('lists_create_with'), blk('lists_length'), blk('lists_getIndex'), blk('lists_setIndex')
+        blk('lists_create_empty'), blk('lists_create_with'),
+        blk('lists_repeat', { NUM: num(5) }), blk('lists_length'), blk('lists_isEmpty'),
+        blk('lists_indexOf'), blk('lists_getIndex'), blk('lists_setIndex'), blk('lists_getSublist'),
+        blk('lists_split', { DELIM: txt(',') }), blk('lists_sort'), blk('lists_reverse')
       ] },
       { kind: 'category', name: 'Variables', categorystyle: 'variable_category', custom: 'VARIABLE' },
       { kind: 'category', name: 'Functions', categorystyle: 'procedure_category', custom: 'PROCEDURE' }
@@ -698,6 +962,7 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
   const EXAMPLES = {
     hello: '<xml><variables><variable id="vc">clicks</variable></variables>' + at(30, 30, chain(
       setVar('vc', 'clicks', N(0)),
+      S('page_title', '<value name="TEXT">' + T('My first page') + '</value>'),
       bg(C('#fff4d6')),
       head(T('My first page 👋')),
       para(T('Built with blocks, running as real JavaScript.')),
@@ -760,7 +1025,49 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
         S('draw_clear'),
         S('draw_rect', '<value name="X">' + N(0) + '</value><value name="Y">' + N(0) + '</value><value name="W">' + N(480) + '</value><value name="H">' + N(320) + '</value><value name="COLOR">' + C('#dff3ff') + '</value>'),
         circle(V('vx', 'x'), V('vy', 'y'), N(22), C('#ff9f1c'))
-      ) + '</statement></block>') + '</xml>'
+      ) + '</statement></block>') + '</xml>',
+
+    paint: '<xml>' + at(30, 30, chain(
+      S('page_title', '<value name="TEXT">' + T('Paint') + '</value>'),
+      head(T('Paint 🎨')),
+      para(T('Hold the mouse down and drag to paint. Press space to start over.')),
+      S('page_canvas'),
+      S('event_mouse', '<field name="TYPE">pointermove</field><statement name="DO">' +
+        S('controls_if', '<value name="IF0"><block type="sense_mouse_down"></block></value><statement name="DO0">' +
+          circle('<block type="sense_mouse"><field name="AXIS">X</field></block>', '<block type="sense_mouse"><field name="AXIS">Y</field></block>',
+            RND(4, 14), '<block type="color_random"></block>').replace('%NEXT%', '') +
+        '</statement>').replace('%NEXT%', '') + '</statement>'),
+      S('event_key', '<field name="KEY"> </field><statement name="DO">' + S('draw_clear').replace('%NEXT%', '') + '</statement>')
+    )) + '</xml>',
+
+    music: '<xml>' + at(30, 30, chain(
+      S('page_title', '<value name="TEXT">' + T('Music box') + '</value>'),
+      bg(C('#fff4d6')),
+      head(T('Music box 🎵')),
+      para(T('Click a button to play it.')),
+      button('Play a tune', chain(
+        S('sound_note', '<field name="NOTE">262</field><value name="SECS">' + N(0.3) + '</value>'),
+        S('sound_note', '<field name="NOTE">330</field><value name="SECS">' + N(0.3) + '</value>'),
+        S('sound_note', '<field name="NOTE">392</field><value name="SECS">' + N(0.3) + '</value>'),
+        S('sound_note', '<field name="NOTE">523</field><value name="SECS">' + N(0.6) + '</value>')
+      )),
+      button('Coin', S('sound_effect', '<field name="FX">coin</field>')),
+      button('Laser', S('sound_effect', '<field name="FX">laser</field>')),
+      button('Talk', S('sound_speak', '<value name="TEXT">' + T('Hello! I was made with blocks.') + '</value>'))
+    )) + '</xml>',
+
+    clock: '<xml>' + at(30, 30, chain(
+      S('page_font', '<field name="FONT">"Courier New", monospace</field>'),
+      S('page_align', '<field name="ALIGN">center</field>'),
+      S('time_every', '<value name="SECS">' + N(1) + '</value><statement name="DO">' + chain(
+        S('page_clear'),
+        S('page_title', '<value name="TEXT"><block type="sense_clock"></block></value>'),
+        head('<block type="sense_clock"></block>'),
+        S('page_last_style', '<field name="STYLE">fontSize = \'1.6em\'</field>'),
+        para(T('Look at the tab title too!')),
+        S('page_emoji', '<value name="TEXT">' + T('⏰') + '</value><value name="SIZE">' + N(72) + '</value>')
+      ) + '</statement>')
+    )) + '</xml>'
   };
 
   function fitView() {
@@ -816,6 +1123,7 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
   const stage = document.getElementById('stage');
   const logEl = document.getElementById('log');
   const runState = document.getElementById('runState');
+  const tabTitle = document.getElementById('tabTitle');
 
   const PAGE_STYLE =
     'body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;padding:20px;color:#1f2233;background:#ffffff;line-height:1.5}' +
@@ -823,7 +1131,8 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
     'button{font:inherit;font-weight:600;padding:9px 16px;border-radius:10px;border:0;background:#2f80ed;color:#fff;cursor:pointer;margin:0 8px 10px 0}' +
     'button:active{transform:translateY(1px)}' +
     'input{font:inherit;padding:8px 10px;border:1.5px solid #c9cde0;border-radius:8px;margin:0 0 10px;display:block;width:min(260px,100%);box-sizing:border-box;background:#fff;color:#1f2233}' +
-    'canvas{display:block;max-width:100%;height:auto;border-radius:10px;background:#f4f5fa;margin:0 0 10px}';
+    'h2{font-size:22px;margin:0 0 8px}a{display:block;margin:0 0 10px;color:#2f80ed;font-weight:600}ul{margin:0 0 10px;padding-left:22px}hr{border:0;border-top:2px solid #e2e5f0;margin:14px 0}' +
+    'canvas{display:block;touch-action:none;max-width:100%;height:auto;border-radius:10px;background:#f4f5fa;margin:0 0 10px}';
 
   function pageHtml(code, forPreview) {
     const safe = code.replace(/<\/(script)/gi, '<\\/$1');
@@ -831,7 +1140,12 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
       ? '<script>(function(){function f(v){if(typeof v==="string")return v;try{return JSON.stringify(v)}catch(e){return String(v)}}' +
         'function s(t,a){parent.postMessage({snapcode:1,type:t,text:Array.prototype.map.call(a,f).join(" ")},"*")}' +
         'console.log=function(){s("log",arguments)};console.info=console.log;console.warn=console.log;' +
-        'console.error=function(){s("error",arguments)};window.alert=function(m){s("log",[m])};' +
+        'console.error=function(){s("error",arguments)};window.alert=function(m){m=f(m);s("log",["popup: "+m]);var o=document.createElement("div");' +
+        'o.setAttribute("style","position:fixed;inset:0;background:rgba(20,22,40,.45);display:grid;place-items:center;z-index:9999");' +
+        'var c=document.createElement("div");c.setAttribute("style","background:#fff;color:#1f2233;padding:18px 20px;border-radius:14px;max-width:300px;font:16px system-ui,sans-serif;text-align:left;box-shadow:0 10px 30px rgba(0,0,0,.3)");' +
+        'c.textContent=m;var b=document.createElement("button");b.textContent="OK";b.setAttribute("style","display:block;margin:14px 0 0 auto");' +
+        'b.onclick=function(){o.remove()};c.appendChild(b);o.appendChild(c);document.documentElement.appendChild(o);b.focus()};' +
+        'new MutationObserver(function(){s("title",[document.title])}).observe(document.head,{subtree:true,childList:true,characterData:true});' +
         'window.onerror=function(m){s("error",[String(m).replace(/^Uncaught (Error: )?/,"")]);return true};' +
         'document.addEventListener("pointerdown",function(){window.focus()});})();<\/script>\n<script>var LoopTrap = 1000000;<\/script>\n'
       : '';
@@ -854,6 +1168,7 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
 
   window.addEventListener('message', (e) => {
     if (e.source !== stage.contentWindow || !e.data || !e.data.snapcode) return;
+    if (e.data.type === 'title') { tabTitle.textContent = '· tab title: “' + e.data.text + '”'; return; }
     log(e.data.text, e.data.type === 'error' ? 'error' : '');
   });
 
@@ -866,6 +1181,7 @@ iframe#stage { flex: 1; width: 100%; border: 0; background: #ffffff; min-height:
       runState.textContent = 'empty';
       return;
     }
+    tabTitle.textContent = '';
     stage.srcdoc = pageHtml(code, true);
     runState.textContent = 'ran at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   }
